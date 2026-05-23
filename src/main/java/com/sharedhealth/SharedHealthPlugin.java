@@ -128,7 +128,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) {
+        if (!(entity instanceof Player source)) {
             return;
         }
 
@@ -146,7 +146,6 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Player source = (Player) entity;
         double sourceHealthBeforeDamage = source.getHealth();
         double sourceAbsorptionBeforeDamage = source.getAbsorptionAmount();
         Bukkit.getScheduler().runTask(
@@ -158,7 +157,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerRegainHealth(EntityRegainHealthEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) {
+        if (!(entity instanceof Player player)) {
             return;
         }
 
@@ -170,7 +169,6 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Player player = (Player) entity;
         if (cfgPreventStackedRegen
                 && isNonStackingSharedRegenReason(event.getRegainReason())
                 && !isNaturalRegenController(player)) {
@@ -181,7 +179,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerRegainHealthMonitor(EntityRegainHealthEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) {
+        if (!(entity instanceof Player player)) {
             return;
         }
 
@@ -193,7 +191,6 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Player player = (Player) entity;
         EntityRegainHealthEvent.RegainReason reason = event.getRegainReason();
         if (cfgPreventStackedRegen && isNonStackingSharedRegenReason(reason) && !isNaturalRegenController(player)) {
             return;
@@ -225,7 +222,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityPotionEffect(EntityPotionEffectEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) {
+        if (!(entity instanceof Player source)) {
             return;
         }
 
@@ -244,14 +241,13 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Player source = (Player) entity;
         Bukkit.getScheduler().runTask(this, () -> syncSharedPotionEffectsFromSource(source));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityResurrect(EntityResurrectEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) {
+        if (!(entity instanceof Player source)) {
             return;
         }
 
@@ -263,7 +259,6 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Player source = (Player) entity;
         Bukkit.getScheduler().runTask(this, () -> {
             if (!source.isOnline() || source.isDead()) {
                 return;
@@ -299,7 +294,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onFoodLevelChange(FoodLevelChangeEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) {
+        if (!(entity instanceof Player player)) {
             return;
         }
 
@@ -311,7 +306,6 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Player player = (Player) entity;
         Bukkit.getScheduler().runTask(this, () -> syncHungerFromPlayer(player));
     }
 
@@ -735,11 +729,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
                 }
 
                 double clamped = clampHealthForPlayer(online, health);
-                if (clamped <= 0.0D) {
-                    online.setHealth(0.0D);
-                } else {
-                    online.setHealth(clamped);
-                }
+                online.setHealth(Math.max(clamped, 0.0D));
             }
         } finally {
             syncingHealth = false;
@@ -877,7 +867,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
 
     private void markPlayerDeathSynced(UUID playerId, long deathCounter) {
         Long previous = playerDeathSync.put(playerId, deathCounter);
-        if (previous == null || previous.longValue() != deathCounter) {
+        if (previous == null || previous != deathCounter) {
             dataDirty = true;
         }
     }
@@ -929,7 +919,7 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
                 .append(Component.text(playerName, NamedTextColor.YELLOW))
                 .append(Component.text(" a perdu ", NamedTextColor.GRAY))
                 .append(Component.text(amountText, NamedTextColor.WHITE))
-                .append(Component.text("\u2764", heartColor));
+                .append(Component.text("❤", heartColor));
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (online.isDead()) {
@@ -1292,11 +1282,8 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
         }
 
         double max = resolvePlayerMaxHealth(player);
-        if (health > max) {
-            return max;
-        }
+        return Math.min(health, max);
 
-        return health;
     }
 
     private double clampAbsorptionForPlayer(Player player, double absorption) {
@@ -1305,11 +1292,8 @@ public final class SharedHealthPlugin extends JavaPlugin implements Listener {
         }
 
         double max = resolvePlayerMaxAbsorption(player);
-        if (absorption > max) {
-            return max;
-        }
+        return Math.min(absorption, max);
 
-        return absorption;
     }
 
     private int clampFoodLevel(int foodLevel) {
